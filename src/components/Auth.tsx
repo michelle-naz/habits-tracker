@@ -40,8 +40,8 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         if (error) throw error
         onAuthSuccess()
       }
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'An error occurred')
     } finally {
       setLoading(false)
     }
@@ -56,8 +56,8 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         }
       })
       if (error) throw error
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'An error occurred')
     }
   }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Calendar, Download, RefreshCw, Target, CheckCircle2, Circle, LogOut } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
@@ -12,12 +12,7 @@ interface Habit {
   user_id: string
 }
 
-interface HabitEntry {
-  id: string
-  habit_id: string
-  date: string
-  completed: boolean
-}
+
 
 interface HabitTracker {
   [habitId: string]: {
@@ -35,6 +30,41 @@ export default function HabitTracker() {
   const [tracker, setTracker] = useState<HabitTracker>({})
   const [weekStartDate, setWeekStartDate] = useState('')
   const [habitInputs, setHabitInputs] = useState(['', '', '', '', ''])
+
+  const getCurrentWeekStart = () => {
+    const today = new Date()
+    const monday = new Date(today)
+    monday.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1))
+    return monday.toISOString().split('T')[0]
+  }
+
+  const loadUserHabits = useCallback(async (userId: string) => {
+    try {
+      // Load habits
+      const { data: habitsData, error: habitsError } = await supabase
+        .from('habits')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+
+      if (habitsError) throw habitsError
+
+      if (habitsData && habitsData.length > 0) {
+        setHabits(habitsData)
+        setIsOnboarding(false)
+        
+        // Load habit entries for current week
+        const weekStart = getCurrentWeekStart()
+        setWeekStartDate(weekStart)
+        await loadHabitEntries(habitsData, weekStart)
+      } else {
+        setIsOnboarding(true)
+        setWeekStartDate(getCurrentWeekStart())
+      }
+    } catch (error) {
+      console.error('Error loading habits:', error)
+    }
+  }, [])
 
   // Check auth state and load user data
   useEffect(() => {
@@ -68,42 +98,7 @@ export default function HabitTracker() {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
-
-  const getCurrentWeekStart = () => {
-    const today = new Date()
-    const monday = new Date(today)
-    monday.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1))
-    return monday.toISOString().split('T')[0]
-  }
-
-  const loadUserHabits = async (userId: string) => {
-    try {
-      // Load habits
-      const { data: habitsData, error: habitsError } = await supabase
-        .from('habits')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true })
-
-      if (habitsError) throw habitsError
-
-      if (habitsData && habitsData.length > 0) {
-        setHabits(habitsData)
-        setIsOnboarding(false)
-        
-        // Load habit entries for current week
-        const weekStart = getCurrentWeekStart()
-        setWeekStartDate(weekStart)
-        await loadHabitEntries(habitsData, weekStart)
-      } else {
-        setIsOnboarding(true)
-        setWeekStartDate(getCurrentWeekStart())
-      }
-    } catch (error) {
-      console.error('Error loading habits:', error)
-    }
-  }
+  }, [loadUserHabits])
 
   const loadHabitEntries = async (userHabits: Habit[], weekStart: string) => {
     try {
